@@ -61,4 +61,8 @@ This separation shows how the system can be adapted to different real-world use 
 * authentication system
 
 ---
+## Author
+Ali Zubair Shah
 
+- GitHub: https://github.com/K3rNel1 
+- Linked In : https://www.linkedin.com/in/ali-zubair-shah-5640033a1/ 
