@@ -1,0 +1,36 @@
+Ali Zubair Shah Personal Use License (AAS-PUL) v1.0 Copyright (c) 2026
+Ali Zubair Shah
+
+Permission is granted to any person obtaining a copy of this software
+and associated documentation files (the “Software”) solely for the
+purposes of educational use, personal learning, individual testing, and
+providing feedback to the author.
+
+You are allowed to: - View and study the source code - Run the software
+for personal and non-commercial use - Experiment with the software
+privately for learning purposes
+
+You are NOT allowed to: - Copy the Software, in whole or in part, for
+use in your own projects - Modify, adapt, translate, or create
+derivative works based on the Software - Distribute, publish, share,
+sublicense, or make the Software available to others - Use the Software
+for any commercial purpose - Claim the Software, or any part of it, as
+your own work - Upload or re-upload this Software to any platform under
+a different name or ownership
+
+Redistribution of this Software, whether modified or unmodified, is
+strictly prohibited without prior written permission from the author.
+
+This Software is provided “AS IS”, without warranty of any kind, express
+or implied. In no event shall the author be liable for any claim,
+damages, or other liability arising from, out of, or in connection with
+the Software or its use.
+
+Any violation of these terms will result in the immediate termination of
+the rights granted under this license.
+
+By using this Software, you agree to be bound by the terms of this
+license.
+
+For permissions beyond the scope of this license, contact the author:
+Ali Zubair Shah
