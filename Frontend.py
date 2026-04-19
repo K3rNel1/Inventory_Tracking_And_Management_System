@@ -18,6 +18,8 @@ from Backend import (
     is_first_run, create_user, verify_login, change_password, get_username,
     # crud
     issue_book, get_all_records, get_record, update_record, delete_record,
+    # duplicate handling
+    get_duplicate_records, delete_duplicate_records, delete_record_by_id,
     # overdue + whatsapp
     get_overdue_records, is_overdue,
     generate_default_message, send_whatsapp_message,
@@ -381,18 +383,39 @@ class LibraryApp(ctk.CTk):
             except ValueError:
                 self._toast("Contact number must be a valid number.", DANGER)
                 return
+
+            # ── Duplicate check ───────────────────────────────────────────────
             try:
-                issue_book(bname, name, mob, doi, dor, rm)
+                duplicates = get_duplicate_records(name, mob)
             except Exception as e:
                 self._toast(f"Database error: {e}", DANGER)
                 return
 
-            self._toast(f"Book \"{bname}\" issued to {name} ✓", SUCCESS)
-            for key, entry in fields.items():
-                entry.delete(0, "end")
-            fields["doi"].insert(0, today_str)
-            fields["dor"].insert(0, return_str)
-            fields["bname"].focus()
+            def _do_insert():
+                try:
+                    issue_book(bname, name, mob, doi, dor, rm)
+                except Exception as e:
+                    self._toast(f"Database error: {e}", DANGER)
+                    return
+                self._toast(f"Book \"{bname}\" issued to {name} ✓", SUCCESS)
+                for key, entry in fields.items():
+                    entry.delete(0, "end")
+                fields["doi"].insert(0, today_str)
+                fields["dor"].insert(0, return_str)
+                fields["bname"].focus()
+
+            def _on_replace(row_id):
+                delete_record_by_id(row_id)
+                _do_insert()
+
+            if duplicates:
+                self._show_duplicate_popup(
+                    duplicates=duplicates,
+                    on_replace=_on_replace,
+                    on_add_anyway=_do_insert,
+                )
+            else:
+                _do_insert()
 
         btn_frame = ctk.CTkFrame(inner, fg_color="transparent")
         btn_frame.grid(row=len(labels) + 2, column=0, columnspan=2,
@@ -559,7 +582,261 @@ class LibraryApp(ctk.CTk):
         ).pack(side="left", padx=2)
 
     # ═══════════════════════════════════════════════════════════════════════════
-    #  WHATSAPP REMINDER DIALOG
+    #  DUPLICATE ENTRY POPUP
+    # ═══════════════════════════════════════════════════════════════════════════
+    def _show_duplicate_popup(self, duplicates, on_replace, on_add_anyway):
+        """
+        Modal popup shown when a duplicate (name) is detected.
+
+        Parameters
+        ----------
+        duplicates    : list of (id, bname, name, mob, doi, dor, rm) tuples
+        on_replace    : callable(row_id) — delete the chosen row then insert new entry
+        on_add_anyway : callable         — insert new entry without touching old ones
+
+        Flow
+        ----
+        Screen 1 — shows all existing matching entries + 3 buttons.
+          Cancel        -> close popup
+          Replace Entry -> 1 duplicate: replace immediately
+                           >1 duplicates: go to Screen 2 to pick which one
+          Add Anyway    -> insert alongside existing entries
+
+        Screen 2 — only when >1 duplicate exists.
+          Click a card to select it, then confirm to replace only that one.
+        """
+        FIELD_LABELS = [
+            ("\U0001f4d6  Book Name",      0),
+            ("\U0001f464  Borrower Name",  1),
+            ("\U0001f4de  Mobile",         2),
+            ("\U0001f4c5  Date of Issue",  3),
+            ("\U0001f501  Date of Return", 4),
+            ("\U0001f4ac  Remarks",        5),
+        ]
+
+        popup = ctk.CTkToplevel(self)
+        popup.title("Existing Entry Found")
+        popup.geometry("520x500")
+        popup.minsize(480, 420)
+        popup.resizable(False, False)
+        popup.configure(fg_color=BG_DARK)
+        popup.grab_set()
+        popup.focus()
+        popup.after(200, lambda: _set_icon(popup))
+
+        popup.update_idletasks()
+        sw = popup.winfo_screenwidth()
+        sh = popup.winfo_screenheight()
+        popup.geometry(f"520x500+{(sw - 520) // 2}+{(sh - 500) // 2}")
+
+        container = ctk.CTkFrame(popup, fg_color="transparent")
+        container.pack(fill="both", expand=True)
+
+        def _clear_container():
+            for w in container.winfo_children():
+                w.destroy()
+
+        def _make_card():
+            """Return a fresh grid-ready card inside the container."""
+            card = ctk.CTkFrame(container, fg_color=CARD_BG, corner_radius=16,
+                                border_width=1, border_color=WARNING_BORDER)
+            card.pack(fill="both", expand=True, padx=20, pady=20)
+            card.grid_rowconfigure(2, weight=1)
+            card.grid_columnconfigure(0, weight=1)
+            return card
+
+        def _entry_block(parent, idx, row_data, show_select_hint=False):
+            """Render one existing-entry card inside a scrollable parent."""
+            row_id, bname, name, mob, doi, dor, rm = row_data
+            values = [bname, name, str(mob), doi, dor, rm or "\u2014"]
+
+            ef = ctk.CTkFrame(parent, fg_color=WARNING_BG, corner_radius=10,
+                              border_width=1, border_color=WARNING_BORDER)
+            ef.pack(fill="x", pady=(0, 8))
+
+            inner = ctk.CTkFrame(ef, fg_color="transparent")
+            inner.pack(fill="x", padx=16, pady=12)
+
+            hdr = ctk.CTkFrame(inner, fg_color="transparent")
+            hdr.pack(fill="x", pady=(0, 6))
+            ctk.CTkLabel(hdr, text=f"Entry {idx + 1}",
+                         font=ctk.CTkFont(size=11, weight="bold"),
+                         text_color=WARNING).pack(side="left")
+            if show_select_hint:
+                ctk.CTkLabel(hdr, text="\u2190 click to select",
+                             font=ctk.CTkFont(size=11),
+                             text_color=TEXT_SECONDARY).pack(side="right")
+
+            for lbl, col_idx in FIELD_LABELS:
+                rf = ctk.CTkFrame(inner, fg_color="transparent")
+                rf.pack(fill="x", pady=2)
+                ctk.CTkLabel(rf, text=lbl,
+                             font=ctk.CTkFont(size=12, weight="bold"),
+                             text_color=TEXT_SECONDARY,
+                             width=150, anchor="w").pack(side="left")
+                ctk.CTkLabel(rf, text=values[col_idx],
+                             font=ctk.CTkFont(size=12),
+                             text_color=TEXT_PRIMARY,
+                             anchor="w").pack(side="left", padx=(8, 0))
+
+            return ef, inner, hdr
+
+        # ─────────────────────────────────────────────────────────────────────
+        #  SCREEN 1
+        # ─────────────────────────────────────────────────────────────────────
+        def _show_screen1():
+            _clear_container()
+            card = _make_card()
+
+            hdr = ctk.CTkFrame(card, fg_color="transparent")
+            hdr.grid(row=0, column=0, sticky="ew", padx=24, pady=(22, 0))
+
+            ctk.CTkLabel(hdr, text="\u26a0\ufe0f  Existing Entry Found",
+                         font=ctk.CTkFont(size=18, weight="bold"),
+                         text_color=WARNING).pack(anchor="w")
+            msg = ("An existing entry already exists with this borrower name."
+                   if len(duplicates) == 1 else
+                   f"{len(duplicates)} existing entries found with this borrower name.")
+            ctk.CTkLabel(hdr, text=msg, font=ctk.CTkFont(size=12),
+                         text_color=TEXT_SECONDARY, justify="left").pack(anchor="w", pady=(6, 0))
+
+            ctk.CTkFrame(card, height=1, fg_color=BORDER).grid(
+                row=1, column=0, sticky="ew", padx=20, pady=(14, 0))
+
+            scroll = ctk.CTkScrollableFrame(card, fg_color="transparent", corner_radius=0,
+                                            scrollbar_button_color=BORDER,
+                                            scrollbar_button_hover_color=TEXT_SECONDARY)
+            scroll.grid(row=2, column=0, sticky="nsew", padx=16, pady=(10, 0))
+
+            for idx, row_data in enumerate(duplicates):
+                _entry_block(scroll, idx, row_data, show_select_hint=False)
+
+            ctk.CTkFrame(card, height=1, fg_color=BORDER).grid(
+                row=3, column=0, sticky="ew", padx=20, pady=(8, 0))
+
+            btn_row = ctk.CTkFrame(card, fg_color="transparent")
+            btn_row.grid(row=4, column=0, sticky="ew", padx=24, pady=(12, 20))
+
+            ctk.CTkButton(btn_row, text="Cancel", width=100, height=36, corner_radius=8,
+                          fg_color=ENTRY_BG, hover_color="#3d1f1f",
+                          text_color=DANGER, border_width=1, border_color=DANGER,
+                          font=ctk.CTkFont(size=13),
+                          command=popup.destroy).pack(side="left")
+
+            def _replace_clicked():
+                if len(duplicates) == 1:
+                    popup.destroy()
+                    on_replace(duplicates[0][0])
+                else:
+                    _show_screen2()
+
+            ctk.CTkButton(btn_row, text="Replace Entry", width=130, height=36, corner_radius=8,
+                          fg_color=WARNING_BG, hover_color="#3d2800",
+                          text_color=WARNING, border_width=1, border_color=WARNING_BORDER,
+                          font=ctk.CTkFont(size=13, weight="bold"),
+                          command=_replace_clicked).pack(side="left", padx=(10, 0))
+
+            ctk.CTkButton(btn_row, text="Add Anyway", width=120, height=36, corner_radius=8,
+                          fg_color="#1a3d1a", hover_color="#2ea043",
+                          text_color=SUCCESS, border_width=1, border_color=SUCCESS,
+                          font=ctk.CTkFont(size=13, weight="bold"),
+                          command=lambda: (popup.destroy(), on_add_anyway())
+                          ).pack(side="right")
+
+        # ─────────────────────────────────────────────────────────────────────
+        #  SCREEN 2 — pick which entry to replace
+        # ─────────────────────────────────────────────────────────────────────
+        def _show_screen2():
+            _clear_container()
+            card = _make_card()
+
+            hdr = ctk.CTkFrame(card, fg_color="transparent")
+            hdr.grid(row=0, column=0, sticky="ew", padx=24, pady=(22, 0))
+
+            ctk.CTkLabel(hdr, text="\U0001f501  Select Entry to Replace",
+                         font=ctk.CTkFont(size=18, weight="bold"),
+                         text_color=WARNING).pack(anchor="w")
+            ctk.CTkLabel(hdr, text="Click on the entry you want to replace with the new record.",
+                         font=ctk.CTkFont(size=12), text_color=TEXT_SECONDARY,
+                         justify="left").pack(anchor="w", pady=(6, 0))
+
+            ctk.CTkFrame(card, height=1, fg_color=BORDER).grid(
+                row=1, column=0, sticky="ew", padx=20, pady=(14, 0))
+
+            scroll = ctk.CTkScrollableFrame(card, fg_color="transparent", corner_radius=0,
+                                            scrollbar_button_color=BORDER,
+                                            scrollbar_button_hover_color=TEXT_SECONDARY)
+            scroll.grid(row=2, column=0, sticky="nsew", padx=16, pady=(10, 0))
+
+            selected_id = ctk.IntVar(value=-1)
+            entry_frames = {}
+
+            def _select(row_id):
+                selected_id.set(row_id)
+                for rid, frm in entry_frames.items():
+                    if rid == row_id:
+                        frm.configure(fg_color="#1a3a1a", border_color=SUCCESS)
+                    else:
+                        frm.configure(fg_color=WARNING_BG, border_color=WARNING_BORDER)
+                confirm_btn.configure(state="normal",
+                                      fg_color="#1a3d1a", hover_color="#2ea043",
+                                      text_color=SUCCESS, border_color=SUCCESS)
+
+            for idx, row_data in enumerate(duplicates):
+                row_id = row_data[0]
+                ef, inner, hdr_frame = _entry_block(scroll, idx, row_data, show_select_hint=True)
+                entry_frames[row_id] = ef
+
+                _rid = row_id
+                for widget in ef.winfo_children() + [ef]:
+                    try:
+                        widget.bind("<Button-1>", lambda e, r=_rid: _select(r))
+                    except Exception:
+                        pass
+                for widget in inner.winfo_children() + [inner]:
+                    try:
+                        widget.bind("<Button-1>", lambda e, r=_rid: _select(r))
+                    except Exception:
+                        pass
+
+            ctk.CTkFrame(card, height=1, fg_color=BORDER).grid(
+                row=3, column=0, sticky="ew", padx=20, pady=(8, 0))
+
+            btn_row = ctk.CTkFrame(card, fg_color="transparent")
+            btn_row.grid(row=4, column=0, sticky="ew", padx=24, pady=(12, 20))
+
+            ctk.CTkButton(btn_row, text="\u2190 Back", width=90, height=36, corner_radius=8,
+                          fg_color=ENTRY_BG, hover_color=CARD_HOVER,
+                          text_color=TEXT_SECONDARY, font=ctk.CTkFont(size=13),
+                          command=_show_screen1).pack(side="left")
+
+            ctk.CTkButton(btn_row, text="Cancel", width=90, height=36, corner_radius=8,
+                          fg_color=ENTRY_BG, hover_color="#3d1f1f",
+                          text_color=DANGER, border_width=1, border_color=DANGER,
+                          font=ctk.CTkFont(size=13),
+                          command=popup.destroy).pack(side="left", padx=(8, 0))
+
+            def _confirm_replace():
+                row_id = selected_id.get()
+                if row_id == -1:
+                    return
+                popup.destroy()
+                on_replace(row_id)
+
+            confirm_btn = ctk.CTkButton(
+                btn_row, text="\u2713  Replace Selected",
+                width=160, height=36, corner_radius=8,
+                fg_color=ENTRY_BG, hover_color=ENTRY_BG,
+                text_color=TEXT_SECONDARY, border_width=1, border_color=BORDER,
+                font=ctk.CTkFont(size=13, weight="bold"),
+                state="disabled",
+                command=_confirm_replace
+            )
+            confirm_btn.pack(side="right")
+
+        _show_screen1()
+
+        #  WHATSAPP REMINDER DIALOG
     # ═══════════════════════════════════════════════════════════════════════════
     def _open_whatsapp_dialog(self, borrower_name):
         rec = get_record(borrower_name)
