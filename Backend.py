@@ -20,14 +20,48 @@ except Exception:
 
 # ─── Database Helper ──────────────────────────────────────────────────────────
 
+def _migrate_register(conn):
+    """
+    If the register table was created with name as PRIMARY KEY (old schema),
+    recreate it as a plain TEXT column and preserve all existing data.
+    Runs inside the existing connection — caller must commit.
+    """
+    # Check if 'name' is still the primary key by inspecting table info
+    cols = conn.execute("PRAGMA table_info(register)").fetchall()
+    # cols: (cid, name, type, notnull, dflt_value, pk)
+    name_col = next((c for c in cols if c[1] == "name"), None)
+    if name_col is None:
+        return  # table doesn't exist yet, nothing to migrate
+    if name_col[5] == 1:  # pk == 1 means this column is the primary key
+        # Back up existing rows
+        rows = conn.execute(
+            "SELECT bname, name, mob, doi, dor, rm FROM register"
+        ).fetchall()
+        conn.execute("DROP TABLE register")
+        conn.execute(
+            "CREATE TABLE register "
+            "(id INTEGER PRIMARY KEY AUTOINCREMENT, "
+            "bname TEXT NOT NULL, name TEXT NOT NULL, mob INTEGER, "
+            "doi TEXT NOT NULL, dor TEXT NOT NULL, rm TEXT)"
+        )
+        conn.executemany(
+            "INSERT INTO register (bname, name, mob, doi, dor, rm) "
+            "VALUES (?,?,?,?,?,?)",
+            rows
+        )
+
+
 def get_connection():
     conn = sqlite3.connect(DB_NAME)
     # Book register table
     conn.execute(
         "CREATE TABLE IF NOT EXISTS register "
-        "(bname TEXT NOT NULL, name TEXT PRIMARY KEY, mob INTEGER, "
+        "(id INTEGER PRIMARY KEY AUTOINCREMENT, "
+        "bname TEXT NOT NULL, name TEXT NOT NULL, mob INTEGER, "
         "doi TEXT NOT NULL, dor TEXT NOT NULL, rm TEXT)"
     )
+    # Migrate legacy table that used name as PRIMARY KEY to new schema
+    _migrate_register(conn)
     # Auth table — id is locked to 1, enforcing a single user
     conn.execute(
         "CREATE TABLE IF NOT EXISTS auth "
@@ -108,10 +142,10 @@ def get_username() -> str:
 # ═══════════════════════════════════════════════════════════════════════════════
 
 def issue_book(bname, name, mob, doi, dor, rm):
-    """Insert or replace a book issue record. Returns True on success."""
+    """Insert a book issue record. Returns True on success."""
     conn = get_connection()
     conn.execute(
-        "INSERT OR REPLACE INTO register (bname, name, mob, doi, dor, rm) "
+        "INSERT INTO register (bname, name, mob, doi, dor, rm) "
         "VALUES (?,?,?,?,?,?)",
         (bname, name, int(mob), doi, dor, rm)
     )
@@ -123,7 +157,7 @@ def issue_book(bname, name, mob, doi, dor, rm):
 def get_all_records():
     """Return all records as a list of tuples (bname, name, mob, doi, dor, rm)."""
     conn = get_connection()
-    rows = conn.execute("SELECT bname, name, mob, doi, dor, rm FROM register").fetchall()
+    rows = conn.execute("SELECT bname, name, mob, doi, dor, rm FROM register ORDER BY id").fetchall()
     conn.close()
     return rows
 
@@ -162,6 +196,47 @@ def delete_record(borrower_name):
     """Delete a record by borrower name. Returns True on success."""
     conn = get_connection()
     conn.execute("DELETE FROM register WHERE name=?", (borrower_name,))
+    conn.commit()
+    conn.close()
+    return True
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+#  DUPLICATE HANDLING
+# ═══════════════════════════════════════════════════════════════════════════════
+
+def get_duplicate_records(name: str, mob=None) -> list:
+    """
+    Return ALL rows whose borrower name matches.
+    mob parameter is accepted but unused (kept for call-site compatibility).
+    Returns a list of tuples (id, bname, name, mob, doi, dor, rm).
+    """
+    conn = get_connection()
+    rows = conn.execute(
+        "SELECT id, bname, name, mob, doi, dor, rm FROM register "
+        "WHERE name = ?",
+        (name.strip(),)
+    ).fetchall()
+    conn.close()
+    return rows
+
+
+def delete_duplicate_records(name: str, mob=None) -> bool:
+    """Delete ALL rows matching the given borrower name."""
+    conn = get_connection()
+    conn.execute(
+        "DELETE FROM register WHERE name = ?",
+        (name.strip(),)
+    )
+    conn.commit()
+    conn.close()
+    return True
+
+
+def delete_record_by_id(row_id: int) -> bool:
+    """Delete a single record by its unique row id."""
+    conn = get_connection()
+    conn.execute("DELETE FROM register WHERE id = ?", (row_id,))
     conn.commit()
     conn.close()
     return True
