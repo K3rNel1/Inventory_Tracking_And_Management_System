@@ -69,7 +69,7 @@ A fully functional **GUI-based executable (.exe)** version of this project is no
 ## 🔮 Future Improvements
 
 * Cloud database integration
-* Advanced analytics dashboard
+* Automated Fine imposition
 * Email/SMS notification system
 
 ---
