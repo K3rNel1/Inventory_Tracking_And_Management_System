@@ -1,76 +1,85 @@
 # 📦 Inventory Tracking & Management System
 
-A simple and user-friendly system designed to manage assets, records, or resources efficiently using a local database.
+A simple, efficient, and user-friendly system designed to manage assets, records, or resources using a local database.
 
 ---
 
 ## 🚀 Demonstration Application: 📚 Library Register
 
-To showcase the capabilities of the system, a **library-based implementation** called **“Library Register”** has been selected.
-This demo simulates real-world inventory usage where:
-
-* Books act as inventory items
-* Users act as borrowers
-* Transactions include issuing and returning items
+To demonstrate the system, a **Library Register application** has been built.
+It allows users to manage book issuance, track borrowers, and automate reminders.
 
 ---
 
-## 📂 Project Structure
+## 💡 Basic Idea
 
-* **Core System:** Inventory Tracking & Management
-* **Demo Application:** Library Register
+The goal of this project is to create a **lightweight inventory system** that:
 
-This separation shows how the system can be adapted to different real-world use cases beyond libraries.
+* Stores data locally
+* Provides a clean GUI interface
+* Handles duplicate entries smartly
+* Automates reminders for due items
+* Eliminates the need of using physical registers.
 
 ---
 
-## ✨ Features
+## ⚙️ Implemented Features
 
-* 📖 Manage inventory (books/resources)
-* 🔄 Issue and return items
-* 👤 Track borrower details
-* 📊 View issued items and transaction records
-* 🗄️ Data stored locally using a database
-* 🔐 Admin control to monitor and manage records
-* 🖥️ Graphical User Interface (GUI) for a modern experience
-* 🔍 Search & filtering functionality
-* 🔐 Authentication system for secure access
-* ⏰ Borrowing time notifications for due returns
-* 💬 WhatsApp notification option to alert users automatically
+* Book issuing system
+* Borrower tracking
+* Contact number storage
+* Issue & return date management
+* Duplicate entry detection system
+* Replace / Add Anyway / Cancel logic for duplicates
+* WhatsApp reminder system
+* GUI-based interaction
+* Local database storage
+* Authentication system (Login/Register)
 
 ---
 
 ## 🛠️ Tech Stack
 
-* **Language:** Python
-* **Database:** SQLite (local `.db` file)
-* **Interface:** CLI + GUI
+* **Python**
+* **Tkinter / Custom GUI**
+* **SQLite (Local Database)**
+* **Pyperclip (Clipboard support)**
+* **OS & Webbrowser modules (for WhatsApp automation)**
 
 ---
 
-## 📦 Application Release
+## ✨ Features
 
-A fully functional **GUI-based executable (.exe)** version of this project is now available.
-
-👉 You can download it from the **Releases section** of this repository.
-
----
-
-## 📌 Key Concepts Demonstrated
-
-* Inventory management logic
-* Local database integration
-* Record tracking system
-* Admin-level control and monitoring
-* GUI integration with backend logic
+* 📖 Issue books with complete details
+* 🔍 View and manage register entries
+* ⚠️ Smart duplicate detection system
+* 🔄 Replace existing entries easily
+* ➕ Add duplicate entries if needed
+* ❌ Cancel unwanted operations
+* 📲 Send automated WhatsApp reminders
+* 🔐 Secure login system
+* 🎨 Clean and modern GUI
 
 ---
 
-## 🔮 Future Improvements
+## 📌 Important Note
 
-* Cloud database integration
-* Automated Fine imposition
-* Email/SMS notification system
+To use the **automated WhatsApp reminder feature**, make sure:
+
+👉 **WhatsApp Desktop is installed on your PC**
+
+---
+
+## 🎥 Project Showcase
+```
+[ YouTube Demo Link Here ]
+```
+
+---
+
+## 📦 Ready-to-Use Application
+
+A **fully compiled version of the application** is available in the **Releases section**.
 
 ---
 
@@ -78,5 +87,11 @@ A fully functional **GUI-based executable (.exe)** version of this project is no
 
 **Ali Zubair Shah**
 
-* GitHub: https://github.com/K3rNel1
-* LinkedIn: https://www.linkedin.com/in/ali-zubair-shah-5640033a1/
+* GitHub: https://github.com/your-github-username
+* LinkedIn: https://linkedin.com/in/your-linkedin
+
+---
+
+## ⭐ Final Note
+
+This project demonstrates how a simple inventory system can be extended into a real-world application with automation, validation, and a clean user experience.
