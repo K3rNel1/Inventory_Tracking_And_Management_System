@@ -72,7 +72,7 @@ To use the **automated WhatsApp reminder feature**, make sure:
 
 ## 🎥 Project Showcase
 ```
-[ YouTube Demo Link Here ]
+[ Not uploaded yet! ]
 ```
 
 ---
